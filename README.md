@@ -1,6 +1,6 @@
 # Sistema de Fechamento — CIA CAP
 
-Sistema web para digitalizar o processo de fechamento de rotas da distribuidora CIA CAP, substituindo o uso de papel e calculadora por uma aplicação com CRUD completo e persistência de dados em banco SQLite.
+Sistema web para digitalizar o processo de fechamento de rotas da subdistribuidora de CIA CAP, substituindo o uso de papel e calculadora por uma aplicação com CRUD completo e persistência de dados em banco SQLite.
 
 ---
 
@@ -53,7 +53,7 @@ Este sistema substitui esse processo por uma aplicação web que permite registr
 | Banco de dados | SQLite via sql.js | ^1.12 |
 | Utilitário | cors | ^2.8 |
 
-> `sql.js` é uma versão do SQLite compilada em WebAssembly puro, sem necessidade de compilação nativa. Escolhida por compatibilidade com qualquer versão do Node.js no Windows.
+
 
 ---
 
