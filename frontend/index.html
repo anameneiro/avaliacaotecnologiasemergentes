@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fechamento — CIA CAP</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:       #F5F4F0;
+      --surface:  #FFFFFF;
+      --border:   #E2E0D8;
+      --text:     #1A1A18;
+      --muted:    #7A7870;
+      --accent:   #1A3A2A;
+      --acc-lt:   #E8F0EB;
+      --red:      #C0392B;
+      --red-lt:   #FDECEA;
+      --blue:     #1A3055;
+      --blue-lt:  #E8EEF5;
+      --amber:    #92600A;
+      --amb-lt:   #FDF3E0;
+      --radius:   10px;
+      --shadow:   0 1px 3px rgba(0,0,0,0.06);
+    }
+    body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; font-size:14px; }
+
+    header { background:var(--accent); color:#fff; padding:0 2rem; height:56px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
+    header h1 { font-size:15px; font-weight:500; letter-spacing:.03em; }
+    header span { font-size:12px; opacity:.6; font-family:'DM Mono',monospace; }
+
+    nav { background:var(--surface); border-bottom:1px solid var(--border); display:flex; padding:0 2rem; }
+    nav button { background:none; border:none; padding:14px 18px; font-family:inherit; font-size:13px; font-weight:500; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; transition:all .15s; }
+    nav button.active { color:var(--accent); border-color:var(--accent); }
+    nav button:hover:not(.active) { color:var(--text); }
+
+    main { max-width:960px; margin:0 auto; padding:2rem 1.5rem; }
+    .page { display:none; }
+    .page.active { display:block; }
+
+    .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.5rem; box-shadow:var(--shadow); margin-bottom:1.25rem; }
+    .card-title { font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin-bottom:1rem; }
+
+    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+    .form-grid.quad { grid-template-columns:repeat(4,1fr); }
+    .form-full { grid-column:1/-1; }
+
+    label { display:flex; flex-direction:column; gap:5px; font-size:12px; font-weight:500; color:var(--muted); }
+    input[type=text], input[type=number] { font-family:'DM Mono',monospace; font-size:13px; padding:9px 11px; border:1px solid var(--border); border-radius:7px; background:var(--bg); color:var(--text); width:100%; transition:border-color .15s,box-shadow .15s; -moz-appearance:textfield; }
+    input[type=text] { font-family:'DM Sans',sans-serif; }
+    input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance:none; }
+    input:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(26,58,42,.1); }
+    input[readonly] { background:#f0f0ec; color:var(--muted); }
+
+    .btn-row { display:flex; gap:10px; flex-wrap:wrap; margin-top:1.25rem; }
+    .btn { font-family:'DM Sans',sans-serif; font-size:13px; font-weight:500; padding:9px 20px; border-radius:7px; border:none; cursor:pointer; transition:opacity .15s,transform .1s; }
+    .btn:active { transform:scale(.98); }
+    .btn-primary   { background:var(--accent); color:#fff; }
+    .btn-danger    { background:var(--red);    color:#fff; }
+    .btn-secondary { background:var(--surface); color:var(--text); border:1px solid var(--border); }
+    .btn-ghost     { background:var(--acc-lt);  color:var(--accent); }
+    .btn:hover { opacity:.88; }
+
+    .totais-grid { display:grid; gap:10px; margin-top:1.25rem; }
+    .total-box { border-radius:8px; padding:12px 14px; display:flex; flex-direction:column; gap:3px; }
+    .t-label { font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:.06em; }
+    .t-val   { font-size:20px; font-weight:600; font-family:'DM Mono',monospace; }
+    .box-amber  { background:var(--amb-lt); }   .box-amber  .t-label,.box-amber  .t-val { color:var(--amber); }
+    .box-recv   { background:var(--acc-lt); }   .box-recv   .t-label,.box-recv   .t-val { color:var(--accent); }
+    .box-desp   { background:var(--red-lt); }   .box-desp   .t-label,.box-desp   .t-val { color:var(--red); }
+    .box-saldo  { background:var(--blue-lt); }  .box-saldo  .t-label,.box-saldo  .t-val { color:var(--blue); }
+
+    .status-bar { margin-top:12px; padding:10px 16px; border-radius:8px; font-size:13px; font-weight:600; letter-spacing:.02em; display:none; }
+    .status-sobrou { background:var(--acc-lt); color:var(--accent); display:block; }
+    .status-faltou { background:var(--red-lt); color:var(--red);    display:block; }
+    .status-exato  { background:var(--blue-lt);color:var(--blue);   display:block; }
+
+    #despesas-lista { display:flex; flex-direction:column; gap:8px; margin-bottom:10px; }
+    .despesa-row { display:flex; gap:8px; align-items:center; }
+    .despesa-row input[type=text]   { flex:2; }
+    .despesa-row input[type=number] { flex:1; }
+    .btn-rm { background:none; border:none; cursor:pointer; color:var(--red); font-size:20px; line-height:1; padding:4px; }
+    .btn-rm:hover { opacity:.6; }
+
+    #toast { position:fixed; bottom:2rem; right:2rem; background:var(--text); color:#fff; padding:12px 20px; border-radius:8px; font-size:13px; font-weight:500; opacity:0; transform:translateY(8px); transition:all .25s; pointer-events:none; z-index:999; }
+    #toast.show         { opacity:1; transform:translateY(0); }
+    #toast.show.success { background:var(--accent); }
+    #toast.show.error   { background:var(--red); }
+
+    .historico-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem; }
+    .historico-header h2 { font-size:16px; font-weight:500; }
+
+    .hist-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1rem 1.25rem; box-shadow:var(--shadow); display:grid; grid-template-columns:1fr auto; align-items:start; gap:1rem; margin-bottom:10px; transition:box-shadow .15s; }
+    .hist-card:hover { box-shadow:0 3px 10px rgba(0,0,0,.09); }
+    .hist-rota { font-size:15px; font-weight:600; margin-bottom:4px; }
+    .hist-meta { font-size:12px; color:var(--muted); font-family:'DM Mono',monospace; }
+    .hist-values { display:flex; gap:1.5rem; margin-top:10px; flex-wrap:wrap; }
+    .hv { display:flex; flex-direction:column; gap:2px; }
+    .hv-label { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:600; }
+    .hv-val   { font-size:13px; font-family:'DM Mono',monospace; font-weight:500; }
+    .hv-amber .hv-val  { color:var(--amber); }
+    .hv-recv  .hv-val  { color:var(--accent); }
+    .hv-desp  .hv-val  { color:var(--red); }
+    .hv-saldo .hv-val  { color:var(--blue); }
+    .hist-badge { display:inline-block; margin-top:8px; padding:4px 10px; border-radius:6px; font-size:12px; font-weight:600; }
+    .badge-sobrou { background:var(--acc-lt);  color:var(--accent); }
+    .badge-faltou { background:var(--red-lt);  color:var(--red); }
+    .badge-exato  { background:var(--blue-lt); color:var(--blue); }
+
+    .hist-actions { display:flex; gap:6px; flex-shrink:0; }
+    .hist-actions button { font-family:'DM Sans',sans-serif; font-size:12px; font-weight:500; padding:6px 14px; border-radius:6px; border:1px solid var(--border); cursor:pointer; background:var(--surface); color:var(--text); transition:all .15s; }
+    .hist-actions button:hover { background:var(--bg); }
+    .btn-del { color:var(--red) !important; border-color:var(--red-lt) !important; }
+    .btn-del:hover { background:var(--red-lt) !important; }
+
+    .empty-state { text-align:center; padding:3rem 1rem; color:var(--muted); font-size:14px; }
+
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:200; align-items:center; justify-content:center; }
+    .modal-overlay.open { display:flex; }
+    .modal { background:var(--surface); border-radius:var(--radius); padding:1.5rem; width:90%; max-width:580px; max-height:90vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.2); }
+    .modal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem; }
+    .modal-header h3 { font-size:15px; font-weight:600; }
+    .modal-close { background:none; border:none; font-size:22px; cursor:pointer; color:var(--muted); line-height:1; }
+
+    @media print {
+      header,nav,.btn-row,.hist-actions,#toast { display:none !important; }
+      body { background:white; }
+      .card { box-shadow:none; border:1px solid #ccc; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Sistema de Fechamento — CIA CAP</h1>
+  <span id="clock"></span>
+</header>
+
+<nav>
+  <button id="nav-novo" class="active">Novo Fechamento</button>
+  <button id="nav-historico">Histórico</button>
+</nav>
+
+<main>
+
+  <!-- NOVO FECHAMENTO -->
+  <div class="page active" id="page-novo">
+
+    <div class="card">
+      <div class="card-title">Dados da Rota</div>
+      <div class="form-grid">
+        <label class="form-full">Nome da Rota
+          <input type="text" id="nome_rota" placeholder="Digite o nome da rota" />
+        </label>
+        <label>Valor da Cartela (R$)
+          <input type="number" id="valor_cartela" placeholder="0,00" step="0.01" />
+        </label>
+        <label>Cartelas Vendidas
+          <input type="number" id="vendidas" placeholder="0" step="1" />
+        </label>
+        <label>Cartelas Devolvidas
+          <input type="number" id="devolvidas" placeholder="0" step="1" />
+        </label>
+        <label>Total de Cartelas
+          <input type="number" id="total_cartelas" placeholder="0" readonly />
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Valores Recebidos</div>
+      <div class="form-grid quad">
+        <label>Dinheiro (R$)   <input type="number" id="dinheiro" placeholder="0,00" step="0.01" /></label>
+        <label>Pix (R$)        <input type="number" id="pix"      placeholder="0,00" step="0.01" /></label>
+        <label>Depósito (R$)   <input type="number" id="deposito" placeholder="0,00" step="0.01" /></label>
+        <label>Moedas (R$)     <input type="number" id="moedas"   placeholder="0,00" step="0.01" /></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Despesas</div>
+      <div id="despesas-lista"></div>
+      <button class="btn btn-ghost" id="btn-add-despesa">+ Adicionar Despesa</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Resumo do Fechamento</div>
+      <div class="totais-grid" style="grid-template-columns:repeat(4,1fr);">
+        <div class="total-box box-amber">
+          <span class="t-label">Valor a Pagar</span>
+          <span class="t-val" id="res-a-pagar">R$ 0,00</span>
+        </div>
+        <div class="total-box box-recv">
+          <span class="t-label">Total Recebido</span>
+          <span class="t-val" id="res-recebido">R$ 0,00</span>
+        </div>
+        <div class="total-box box-desp">
+          <span class="t-label">Total Despesas</span>
+          <span class="t-val" id="res-despesas">R$ 0,00</span>
+        </div>
+        <div class="total-box box-saldo">
+          <span class="t-label">Saldo Final</span>
+          <span class="t-val" id="res-saldo">R$ 0,00</span>
+        </div>
+      </div>
+      <div class="status-bar" id="res-status"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary"   id="btn-salvar">Salvar Fechamento</button>
+        <button class="btn btn-secondary" id="btn-limpar">Limpar Tudo</button>
+        <button class="btn btn-ghost"     id="btn-imprimir">Imprimir / Exportar</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- HISTÓRICO -->
+  <div class="page" id="page-historico">
+    <div class="historico-header">
+      <h2>Histórico de Fechamentos</h2>
+      <button class="btn btn-ghost" id="btn-atualizar">Atualizar</button>
+    </div>
+    <div id="historico-lista"><div class="empty-state">Carregando...</div></div>
+  </div>
+
+</main>
+
+<!-- MODAL EDITAR -->
+<div class="modal-overlay" id="modal-editar">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Editar Fechamento</h3>
+      <button class="modal-close" id="modal-fechar">×</button>
+    </div>
+    <input type="hidden" id="edit-id" />
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="card-title">Dados da Rota</div>
+      <div class="form-grid">
+        <label class="form-full">Nome da Rota <input type="text" id="edit-nome" /></label>
+        <label>Valor da Cartela (R$) <input type="number" id="edit-valor-cartela" step="0.01" /></label>
+        <label>Vendidas             <input type="number" id="edit-vendidas"      step="1" /></label>
+        <label>Devolvidas           <input type="number" id="edit-devolvidas"    step="1" /></label>
+        <label>Dinheiro (R$)        <input type="number" id="edit-dinheiro"      step="0.01" /></label>
+        <label>Pix (R$)             <input type="number" id="edit-pix"           step="0.01" /></label>
+        <label>Depósito (R$)        <input type="number" id="edit-deposito"      step="0.01" /></label>
+        <label>Moedas (R$)          <input type="number" id="edit-moedas"        step="0.01" /></label>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="card-title">Despesas</div>
+      <div id="edit-despesas-lista"></div>
+      <button class="btn btn-ghost" id="edit-btn-add-despesa" style="font-size:12px;padding:7px 14px;">+ Adicionar Despesa</button>
+    </div>
+    <div class="totais-grid" style="grid-template-columns:repeat(4,1fr); margin-bottom:.5rem;">
+      <div class="total-box box-amber">
+        <span class="t-label">Valor a Pagar</span>
+        <span class="t-val" id="edit-res-pagar">R$ 0,00</span>
+      </div>
+      <div class="total-box box-recv">
+        <span class="t-label">Recebido</span>
+        <span class="t-val" id="edit-res-recebido">R$ 0,00</span>
+      </div>
+      <div class="total-box box-desp">
+        <span class="t-label">Despesas</span>
+        <span class="t-val" id="edit-res-despesas">R$ 0,00</span>
+      </div>
+      <div class="total-box box-saldo">
+        <span class="t-label">Saldo</span>
+        <span class="t-val" id="edit-res-saldo">R$ 0,00</span>
+      </div>
+    </div>
+    <div class="status-bar" id="edit-res-status" style="margin-bottom:1rem;"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary"   id="btn-salvar-edicao">Salvar Alterações</button>
+      <button class="btn btn-secondary" id="btn-cancelar-edicao">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const API = "http://localhost:3000";
+const fmt = v => "R$ " + Number(v||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+const gv  = id => parseFloat(document.getElementById(id)?.value) || 0;
+const el  = id => document.getElementById(id);
+
+// ── Relógio ──────────────────────────────────────────────────
+function tick() {
+  const n = new Date();
+  el("clock").textContent = n.toLocaleDateString("pt-BR") + "  " +
+    n.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+}
+tick(); setInterval(tick, 10000);
+
+// ── Toast ────────────────────────────────────────────────────
+function toast(msg, tipo="success") {
+  const t = el("toast");
+  t.textContent = msg;
+  t.className = "show " + tipo;
+  setTimeout(() => t.className = "", 3000);
+}
+
+// ── Páginas ──────────────────────────────────────────────────
+function showPage(id) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  el("page-" + id).classList.add("active");
+  el("nav-novo").classList.toggle("active", id === "novo");
+  el("nav-historico").classList.toggle("active", id === "historico");
+  if (id === "historico") carregarHistorico();
+}
+
+el("nav-novo").addEventListener("click", () => showPage("novo"));
+el("nav-historico").addEventListener("click", () => showPage("historico"));
+
+// ── Status sobrou/faltou ─────────────────────────────────────
+function atualizarStatus(statusEl, diferenca) {
+  if (diferenca > 0.005) {
+    statusEl.className = "status-bar status-sobrou";
+    statusEl.textContent = "SOBROU " + fmt(diferenca) + " nesta rota";
+  } else if (diferenca < -0.005) {
+    statusEl.className = "status-bar status-faltou";
+    statusEl.textContent = "FALTOU " + fmt(Math.abs(diferenca)) + " nesta rota";
+  } else {
+    statusEl.className = "status-bar status-exato";
+    statusEl.textContent = "FECHAMENTO EXATO — sem sobra nem falta";
+  }
+}
+
+// ── Despesas (novo) ──────────────────────────────────────────
+let despesas = [];
+
+function renderDespesas() {
+  el("despesas-lista").innerHTML = despesas.map((d, i) => `
+    <div class="despesa-row">
+      <input type="text" placeholder="Descrição da despesa" value="${d.descricao||""}"
+        oninput="despesas[${i}].descricao=this.value" />
+      <input type="number" placeholder="0,00" step="0.01" value="${d.valor||""}"
+        oninput="despesas[${i}].valor=parseFloat(this.value)||0; calcular()" />
+      <button class="btn-rm" onclick="removerDespesa(${i})">×</button>
+    </div>`).join("");
+}
+
+function removerDespesa(i) { despesas.splice(i,1); renderDespesas(); calcular(); }
+
+el("btn-add-despesa").addEventListener("click", () => {
+  despesas.push({descricao:"", valor:0}); renderDespesas();
+});
+
+// ── Cálculo (novo) ───────────────────────────────────────────
+function calcular() {
+  const vendidas   = gv("vendidas");
+  const devolvidas = gv("devolvidas");
+  el("total_cartelas").value = vendidas + devolvidas;
+
+  const aPagar    = vendidas * gv("valor_cartela");
+  const recebido  = gv("dinheiro") + gv("pix") + gv("deposito") + gv("moedas");
+  const totalDesp = despesas.reduce((s,d) => s + (parseFloat(d.valor)||0), 0);
+  const saldo     = recebido - totalDesp;
+  const diferenca = saldo - aPagar;
+
+  el("res-a-pagar").textContent  = fmt(aPagar);
+  el("res-recebido").textContent = fmt(recebido);
+  el("res-despesas").textContent = fmt(totalDesp);
+  el("res-saldo").textContent    = fmt(saldo);
+  atualizarStatus(el("res-status"), diferenca);
+}
+
+// Ouvintes de input para cálculo automático
+["valor_cartela","vendidas","devolvidas","dinheiro","pix","deposito","moedas"]
+  .forEach(id => el(id).addEventListener("input", calcular));
+
+// ── Salvar ────────────────────────────────────────────────────
+el("btn-salvar").addEventListener("click", async () => {
+  const nome = el("nome_rota").value.trim();
+  if (!nome) { toast("Informe o nome da rota.", "error"); return; }
+
+  const aPagar    = gv("vendidas") * gv("valor_cartela");
+  const recebido  = gv("dinheiro") + gv("pix") + gv("deposito") + gv("moedas");
+  const totalDesp = despesas.reduce((s,d) => s + (parseFloat(d.valor)||0), 0);
+  const saldo     = recebido - totalDesp;
+
+  const body = {
+    nome_rota:nome, valor_cartela:gv("valor_cartela"),
+    vendidas:gv("vendidas"), devolvidas:gv("devolvidas"),
+    dinheiro:gv("dinheiro"), pix:gv("pix"),
+    deposito:gv("deposito"), moedas:gv("moedas"),
+    despesas, total_recebido:recebido,
+    total_despesas:totalDesp, saldo,
+    valor_a_pagar:aPagar, diferenca:saldo - aPagar,
+  };
+
+  try {
+    const r = await fetch(API+"/fechamentos", {
+      method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)
+    });
+    if (!r.ok) { const e=await r.json(); toast(e.erro||"Erro ao salvar.","error"); return; }
+    toast("Fechamento salvo com sucesso!");
+    limparTudo();
+  } catch { toast("Servidor indisponível.","error"); }
+});
+
+// ── Limpar ────────────────────────────────────────────────────
+function limparTudo() {
+  ["nome_rota","valor_cartela","vendidas","devolvidas","total_cartelas",
+   "dinheiro","pix","deposito","moedas"].forEach(id => { if(el(id)) el(id).value=""; });
+  despesas = []; renderDespesas(); calcular();
+}
+
+el("btn-limpar").addEventListener("click", limparTudo);
+el("btn-imprimir").addEventListener("click", () => window.print());
+
+// ── Histórico ─────────────────────────────────────────────────
+async function carregarHistorico() {
+  el("historico-lista").innerHTML = '<div class="empty-state">Carregando...</div>';
+  try {
+    const r = await fetch(API+"/fechamentos");
+    const dados = await r.json();
+    if (!dados.length) {
+      el("historico-lista").innerHTML = '<div class="empty-state">Nenhum fechamento registrado ainda.</div>';
+      return;
+    }
+    el("historico-lista").innerHTML = dados.map(f => {
+      const aPagar = f.valor_a_pagar ?? (f.vendidas * f.valor_cartela);
+      const dif    = f.diferenca    ?? (f.saldo - aPagar);
+      const badge  = Math.abs(dif) < 0.005
+        ? `<span class="hist-badge badge-exato">FECHAMENTO EXATO</span>`
+        : dif > 0
+          ? `<span class="hist-badge badge-sobrou">SOBROU ${fmt(dif)}</span>`
+          : `<span class="hist-badge badge-faltou">FALTOU ${fmt(Math.abs(dif))}</span>`;
+      return `
+        <div class="hist-card">
+          <div>
+            <div class="hist-rota">${f.nome_rota}</div>
+            <div class="hist-meta">${new Date(f.criado_em).toLocaleString("pt-BR")}</div>
+            <div class="hist-values">
+              <div class="hv hv-amber"><span class="hv-label">A Pagar</span><span class="hv-val">${fmt(aPagar)}</span></div>
+              <div class="hv hv-recv"> <span class="hv-label">Recebido</span><span class="hv-val">${fmt(f.total_recebido)}</span></div>
+              <div class="hv hv-desp"> <span class="hv-label">Despesas</span><span class="hv-val">${fmt(f.total_despesas)}</span></div>
+              <div class="hv hv-saldo"><span class="hv-label">Saldo</span><span class="hv-val">${fmt(f.saldo)}</span></div>
+              <div class="hv"><span class="hv-label">Vendidas</span><span class="hv-val">${f.vendidas}</span></div>
+              <div class="hv"><span class="hv-label">Devolvidas</span><span class="hv-val">${f.devolvidas}</span></div>
+            </div>
+            ${badge}
+          </div>
+          <div class="hist-actions">
+            <button data-edit="${f.id}">Editar</button>
+            <button class="btn-del" data-del="${f.id}">Excluir</button>
+          </div>
+        </div>`;
+    }).join("");
+
+    // Delegar eventos dos botões do histórico
+    el("historico-lista").querySelectorAll("[data-edit]").forEach(b =>
+      b.addEventListener("click", () => abrirEditar(b.dataset.edit)));
+    el("historico-lista").querySelectorAll("[data-del]").forEach(b =>
+      b.addEventListener("click", () => deletar(b.dataset.del)));
+
+  } catch { el("historico-lista").innerHTML = '<div class="empty-state">Não foi possível conectar ao servidor.</div>'; }
+}
+
+el("btn-atualizar").addEventListener("click", carregarHistorico);
+
+// ── Deletar ───────────────────────────────────────────────────
+async function deletar(id) {
+  if (!confirm("Excluir este fechamento?")) return;
+  try {
+    const r = await fetch(API+"/fechamentos/"+id, {method:"DELETE"});
+    if (r.ok) { toast("Fechamento excluído."); carregarHistorico(); }
+    else toast("Erro ao excluir.","error");
+  } catch { toast("Servidor indisponível.","error"); }
+}
+
+// ── Modal editar ──────────────────────────────────────────────
+let despesasEdit = [];
+
+function fecharModal() { el("modal-editar").classList.remove("open"); }
+el("modal-fechar").addEventListener("click", fecharModal);
+el("btn-cancelar-edicao").addEventListener("click", fecharModal);
+el("modal-editar").addEventListener("click", e => { if(e.target===el("modal-editar")) fecharModal(); });
+
+el("edit-btn-add-despesa").addEventListener("click", () => {
+  despesasEdit.push({descricao:"",valor:0}); renderDespesasEdit();
+});
+
+function renderDespesasEdit() {
+  el("edit-despesas-lista").innerHTML = despesasEdit.map((d,i) => `
+    <div class="despesa-row">
+      <input type="text" placeholder="Descrição" value="${d.descricao||""}"
+        oninput="despesasEdit[${i}].descricao=this.value" />
+      <input type="number" placeholder="0,00" step="0.01" value="${d.valor||""}"
+        oninput="despesasEdit[${i}].valor=parseFloat(this.value)||0; calcularEdit()" />
+      <button class="btn-rm" onclick="removerDespesaEdit(${i})">×</button>
+    </div>`).join("");
+}
+
+function removerDespesaEdit(i) { despesasEdit.splice(i,1); renderDespesasEdit(); calcularEdit(); }
+
+function calcularEdit() {
+  const vendidas  = gv("edit-vendidas");
+  const aPagar    = vendidas * gv("edit-valor-cartela");
+  const recebido  = gv("edit-dinheiro") + gv("edit-pix") + gv("edit-deposito") + gv("edit-moedas");
+  const totalDesp = despesasEdit.reduce((s,d) => s + (parseFloat(d.valor)||0), 0);
+  const saldo     = recebido - totalDesp;
+
+  el("edit-res-pagar").textContent    = fmt(aPagar);
+  el("edit-res-recebido").textContent = fmt(recebido);
+  el("edit-res-despesas").textContent = fmt(totalDesp);
+  el("edit-res-saldo").textContent    = fmt(saldo);
+  atualizarStatus(el("edit-res-status"), saldo - aPagar);
+}
+
+["edit-valor-cartela","edit-vendidas","edit-devolvidas",
+ "edit-dinheiro","edit-pix","edit-deposito","edit-moedas"]
+  .forEach(id => el(id).addEventListener("input", calcularEdit));
+
+async function abrirEditar(id) {
+  try {
+    const f = await (await fetch(API+"/fechamentos/"+id)).json();
+    el("edit-id").value              = f.id;
+    el("edit-nome").value            = f.nome_rota;
+    el("edit-valor-cartela").value   = f.valor_cartela;
+    el("edit-vendidas").value        = f.vendidas;
+    el("edit-devolvidas").value      = f.devolvidas;
+    el("edit-dinheiro").value        = f.dinheiro;
+    el("edit-pix").value             = f.pix;
+    el("edit-deposito").value        = f.deposito;
+    el("edit-moedas").value          = f.moedas;
+    despesasEdit = f.despesas || [];
+    renderDespesasEdit(); calcularEdit();
+    el("modal-editar").classList.add("open");
+  } catch { toast("Erro ao carregar fechamento.","error"); }
+}
+
+el("btn-salvar-edicao").addEventListener("click", async () => {
+  const id   = el("edit-id").value;
+  const nome = el("edit-nome").value.trim();
+  if (!nome) { toast("Informe o nome da rota.","error"); return; }
+
+  const aPagar    = gv("edit-vendidas") * gv("edit-valor-cartela");
+  const recebido  = gv("edit-dinheiro") + gv("edit-pix") + gv("edit-deposito") + gv("edit-moedas");
+  const totalDesp = despesasEdit.reduce((s,d) => s + (parseFloat(d.valor)||0), 0);
+  const saldo     = recebido - totalDesp;
+
+  const body = {
+    nome_rota:nome, valor_cartela:gv("edit-valor-cartela"),
+    vendidas:gv("edit-vendidas"), devolvidas:gv("edit-devolvidas"),
+    dinheiro:gv("edit-dinheiro"), pix:gv("edit-pix"),
+    deposito:gv("edit-deposito"), moedas:gv("edit-moedas"),
+    despesas:despesasEdit, total_recebido:recebido,
+    total_despesas:totalDesp, saldo,
+    valor_a_pagar:aPagar, diferenca:saldo - aPagar,
+  };
+
+  try {
+    const r = await fetch(API+"/fechamentos/"+id, {
+      method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)
+    });
+    if (r.ok) { toast("Fechamento atualizado!"); fecharModal(); carregarHistorico(); }
+    else { const e=await r.json(); toast(e.erro||"Erro ao salvar.","error"); }
+  } catch { toast("Servidor indisponível.","error"); }
+});
+</script>
+</body>
+</html>
